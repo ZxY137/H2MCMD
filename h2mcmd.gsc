@@ -1,7 +1,7 @@
 init() {
     level thread command_listener();
     level.systemName = "[^:H2M-CMD^7] ";
-    level.adminList = ["YOUR XUID"];
+    level.adminList = ["YOUR-XUID"];
 }
 isInArray(array, value)
 {
@@ -30,6 +30,7 @@ listCommands(player) {
         "!ban [player]",
         "!warn [player]",
         "!tp [player1] [player2]",
+        "!givexp [player] [amount]",
         "!kill [player]",
         "!switch [player]",
         "!exec [command]",
@@ -65,6 +66,9 @@ commandHelp(player, cmd) {
         case "!ban":
             helpText = "!ban [player] - Bans the specified player from the server.";
             break;
+        case "!giveXP":
+            helpText = "!giveXP [player] [amount] - Gives the specified player a certain amount of XP.";
+            break;
         case "!warn":
             helpText = "!warn [player] - Warns the specified player.";
             break;
@@ -90,9 +94,40 @@ commandHelp(player, cmd) {
     
     tell_sender(helpText);
 }
+getPlayerByPartialName(partialName) {
+    matches = [];
+    partialName = toLower(partialName);  // Convert to lowercase for case-insensitive matching
+
+    foreach (player in level.players) {
+        playerNameLower = toLower(player.name);
+        if (issubstr(playerNameLower, partialName)) {
+            matches[matches.size] = player;
+        }
+    }
+
+    if (matches.size == 1) {
+        return matches[0];
+    } else if (matches.size > 1) {
+        tell_sender("Too many matches: " + joinPlayerNames(matches));
+        return undefined;
+    }
+
+    return undefined;
+}
+
+joinPlayerNames(players) {
+    names = "";
+    for(i = 0; i < players.size; i++) {
+        names += players[i].name;
+        if (i < players.size - 1) {
+            names += ", ";
+        }
+    }
+    return names;
+}
 
 command_listener(){
-    admins = ["67f8de6e1e9a11a8"];
+    admins = level.adminList;
     self endon("disconnect");
     
     while (true){
@@ -100,7 +135,7 @@ command_listener(){
         if (getsubstr(message, 0, 1) == "!"){
 
             args = strTok(message, " ");  // Split message into arguments
-            
+            args[0] = toLower(args[0]); 
             switch(args[0]){
                 case "!test":
                     tell_sender("Test OK!");
@@ -117,7 +152,7 @@ command_listener(){
                 case "!kick":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 2){
-                            targetPlayer = getPlayerByName(args[1]);
+                            targetPlayer = getPlayerByPartialName(args[1]);
                             if(targetPlayer != undefined){
                                 kickPlayer(targetPlayer);
                                 announce("Kicked player " + targetPlayer.name);
@@ -136,7 +171,7 @@ command_listener(){
                 case "!ban":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 2){
-                            targetPlayer = getPlayerByName(args[1]);
+                            targetPlayer = getPlayerByPartialName(args[1]);
                             if(targetPlayer != undefined){
                                 banPlayer(targetPlayer);
                                 announce("Banned player " + targetPlayer.name);
@@ -154,7 +189,7 @@ command_listener(){
                 case "!warn":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 2){
-                            targetPlayer = getPlayerByName(args[1]);
+                            targetPlayer = getPlayerByPartialName(args[1]);
                             if(targetPlayer != undefined){
                                 warnPlayer(targetPlayer);
                                 announce("Warned player " + targetPlayer.name);
@@ -172,8 +207,8 @@ command_listener(){
                 case "!tp":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 3){
-                            targetPlayer1 = getPlayerByName(args[1]);
-                            targetPlayer2 = getPlayerByName(args[2]);
+                            targetPlayer1 = getPlayerByPartialName(args[1]);
+                            targetPlayer2 = getPlayerByPartialName(args[2]);
                             if(targetPlayer1 != undefined && targetPlayer2 != undefined){
                                 teleportPlayer(targetPlayer1, targetPlayer2);
                                 tell_sender("Teleported " + targetPlayer1.name + " to " + targetPlayer2.name);
@@ -191,7 +226,7 @@ command_listener(){
                 case "!kill":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 2){
-                            targetPlayer = getPlayerByName(args[1]);
+                            targetPlayer = getPlayerByPartialName(args[1]);
                             if(targetPlayer != undefined){
                                 killPlayer(targetPlayer);
                                 tell_sender("Killed player " + targetPlayer.name);
@@ -209,7 +244,7 @@ command_listener(){
                 case "!switch":
                     if(isInArray(admins, player.xuid)){
                         if(args.size >= 2){
-                            targetPlayer = getPlayerByName(args[1]);
+                            targetPlayer = getPlayerByPartialName(args[1]);
                             if(targetPlayer != undefined){
                                 switchTeam(targetPlayer);
                                 announce("Switched team of player " + targetPlayer.name);
@@ -255,7 +290,24 @@ command_listener(){
                         tell_sender("Please specify a command for help.");
                     }
                     break;
-                    
+                case "!givexp":
+                    if(isInArray(admins, player.xuid)){
+                        if(args.size >= 3){
+                            targetPlayer = getPlayerByPartialName(args[1]);
+                            xpAmount = int(args[2]);  // Convert the XP amount to an integer
+                            if(targetPlayer != undefined){
+                                giveXPPlayer(targetPlayer, xpAmount);
+                                tell_sender("Gave " + xpAmount + " XP to player " + targetPlayer.name);
+                            } else {
+                                tell_sender("Player not found");
+                            }
+                        } else {
+                            tell_sender("Please specify a player name and an XP amount");
+                        }
+                    } else {
+                        tell_sender("not enough permissions");
+                    }
+                    break;
                 default:
                     tell_sender("Unknown Command");
                     break;
@@ -283,7 +335,28 @@ banPlayer(player) {
 }
 
 warnPlayer(player) {
-    player iPrintlnBold("^1Warning: ^7You have been warned by an admin.");
+    player maps\mp\_utility::freezecontrolswrapper( 1 );
+
+    player VisionSetNakedForPlayer("black_bw", 1);
+    player setclienttriggervisionset("black_bw", 1);
+    
+    //classic way
+    //player iPrintlnBold("^1Warning: ^7You have been warned by an admin.");
+    /*notifyData = spawnstruct();
+	notifyData.titleText = "^1 You have been warned by an Admin";
+	notifyData.notifyText = "^:Be careful! Any further violation";
+	notifyData.iconName = "i_infect_eye_unlit_c";
+	notifyData.glowColor = (0, 1, 0);
+	notifyData.notifyText2 = "^1may result in a Kick/Ban";
+	notifyData.duration = 5;
+    */
+	player thread maps\mp\gametypes\_hud_message::oldnotifyMessage("^1 You have been warned by an Admin","^:Be careful! Any further violation result in Kick/Ban","headicon_dead",(0, 1, 0),"",7);
+
+    wait(4);
+
+    player VisionSetNakedForPlayer("",1);
+    player setclienttriggervisionset("", 1);
+    player maps\mp\_utility::freezecontrolswrapper( 0 );
 }
 
 teleportPlayer(player1, player2) {
@@ -297,4 +370,9 @@ killPlayer(player) {
 switchTeam(player) {
     player.team = player.team == "axis" ? "allies" : "axis";
     player suicide();
+}
+giveXPPlayer(player, amount) {
+    player maps\mp\gametypes\_rank::giverankxp("kill", amount);
+    player maps\mp\_utility::logxpgains();
+    player iPrintlnBold("^2You have been given " + amount + " XP.");
 }
